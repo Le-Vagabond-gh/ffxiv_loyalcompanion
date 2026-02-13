@@ -3,6 +3,8 @@ Associates minion lists with gearsets and auto-summons a random minion from the 
 
 **Author:** Le Vagabond
 
+![Screenshot](screen.png)
+
 ## Features
 - Configure a list of minions for each gearset
 - Automatically summons a random minion from the list when you equip a gearset
