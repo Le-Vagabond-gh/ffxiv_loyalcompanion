@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project Sdk="Dalamud.NET.Sdk/14.0.1">
+
+  <PropertyGroup>
+    <Version>0.0.0.1</Version>
+    <TargetFramework>net10.0</TargetFramework>
+    <Description>Associates minion lists with gearsets and auto-summons a random minion when conditions allow</Description>
+    <PackageProjectUrl>https://github.com/Le-Vagabond-gh/ffxiv_loyalcompanion</PackageProjectUrl>
+    <PackageLicenseExpression>AGPL-3.0-or-later</PackageLicenseExpression>
+    <IsPackable>false</IsPackable>
+    <Configurations>Debug;ExportDebug;ExportRelease;Release</Configurations>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(GITHUB_ACTIONS)' != 'true'">
+    <OutputPath>E:\FINAL FANTASY XIV\plugins\LoyalCompanion\</OutputPath>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Content Include="icon.png" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>

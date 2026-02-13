@@ -1,0 +1,18 @@
+{
+    "Author": "Le Vagabond",
+    "Name": "LoyalCompanion",
+    "InternalName": "LoyalCompanion",
+    "AssemblyVersion": "0.0.0.1",
+    "Description": "Associates minion lists with gearsets and auto-summons a random minion",
+    "ApplicableVersion": "any",
+    "RepoUrl": "https://github.com/Le-Vagabond-gh/ffxiv_loyalcompanion",
+    "DalamudApiLevel": 14,
+    "LoadRequiredState": 0,
+    "LoadSync": false,
+    "CanUnloadAsync": false,
+    "LoadPriority": 0,
+    "Punchline": "Your loyal companions, always by your side",
+    "AcceptsFeedback": true,
+    "Tags": ["minion", "companion", "gearset", "cosmetic", "summon"],
+    "IconUrl": "https://raw.githubusercontent.com/Le-Vagabond-gh/ffxiv_loyalcompanion/main/LoyalCompanion/icon.png"
+}

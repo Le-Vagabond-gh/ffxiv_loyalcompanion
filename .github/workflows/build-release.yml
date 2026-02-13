@@ -1,0 +1,74 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Download Dalamud
+        run: |
+          curl -L https://goatcorp.github.io/dalamud-distrib/stg/latest.zip -o dalamud.zip
+          unzip dalamud.zip -d dalamud
+          rm dalamud.zip
+
+      - name: Build
+        env:
+          DALAMUD_HOME: ${{ github.workspace }}/dalamud
+        run: dotnet build -c Release --property:WarningLevel=0
+        working-directory: LoyalCompanion
+
+      - name: Get version from tag
+        id: get_version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: LoyalCompanion
+          path: |
+            LoyalCompanion/bin/Release/LoyalCompanion.dll
+            LoyalCompanion/bin/Release/LoyalCompanion.json
+
+      - name: Create Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            TAG="${{ github.ref_name }}"
+          else
+            TAG="v$(date +'%Y%m%d%H%M%S')-${GITHUB_SHA::7}"
+          fi
+
+          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+
+          if [ -n "$PREV_TAG" ]; then
+            gh release create "$TAG" \
+              LoyalCompanion/bin/Release/LoyalCompanion.dll \
+              LoyalCompanion/bin/Release/LoyalCompanion.json \
+              --generate-notes \
+              --notes-start-tag "$PREV_TAG" \
+              --title "Release $TAG"
+          else
+            gh release create "$TAG" \
+              LoyalCompanion/bin/Release/LoyalCompanion.dll \
+              LoyalCompanion/bin/Release/LoyalCompanion.json \
+              --generate-notes \
+              --title "Release $TAG"
+          fi
