@@ -12,16 +12,16 @@ namespace LoyalCompanion
     public class GearSetOverlay : IDisposable
     {
         private readonly Configuration configuration;
-        private readonly MinionSelectWindow minionSelectWindow;
+        private readonly ListAssignWindow listAssignWindow;
 
-        // Layout constants (unscaled pixels) — adjust if alignment is off
+        // Layout constants (unscaled pixels) - adjust if alignment is off
         private const float HeaderOffset = 39f;
         private const float RowHeight = 28.5f;
 
-        public GearSetOverlay(Configuration configuration, MinionSelectWindow minionSelectWindow)
+        public GearSetOverlay(Configuration configuration, ListAssignWindow listAssignWindow)
         {
             this.configuration = configuration;
-            this.minionSelectWindow = minionSelectWindow;
+            this.listAssignWindow = listAssignWindow;
         }
 
         public void Dispose() { }
@@ -104,8 +104,8 @@ namespace LoyalCompanion
                 ImGui.SetCursorPosY(rowY + (rowH - buttonHeight) * 0.5f);
                 ImGui.SetCursorPosX(4f * scale);
 
-                var hasMinions = configuration.GearsetMinions.TryGetValue(gearsetId, out var minionList)
-                    && minionList.Count > 0;
+                var assignedList = configuration.GetListForGearset(gearsetId);
+                var hasMinions = assignedList != null && assignedList.Minions.Count > 0;
 
                 if (hasMinions)
                     ImGui.PushStyleColor(ImGuiCol.Text, new Vector4(0.0f, 0.8f, 0.4f, 1.0f));
@@ -115,7 +115,7 @@ namespace LoyalCompanion
                     var btnRight = ImGui.GetItemRectMax();
                     var gearset = gearsetModule->GetGearset(gearsetId);
                     var name = gearset != null ? GetGearsetName(gearset) : $"Gearset {gearsetId + 1}";
-                    minionSelectWindow.SetGearset(gearsetId, name, new Vector2(btnRight.X + 4, ImGui.GetItemRectMin().Y));
+                    listAssignWindow.SetGearset(gearsetId, name, new Vector2(btnRight.X + 4, ImGui.GetItemRectMin().Y));
                 }
 
                 // Overlay gearset number on the button
@@ -142,8 +142,10 @@ namespace LoyalCompanion
 
                 if (ImGui.IsItemHovered())
                 {
-                    var count = hasMinions ? minionList!.Count : 0;
-                    ImGui.SetTooltip($"{count} minion(s)");
+                    if (assignedList != null)
+                        ImGui.SetTooltip($"{assignedList.Name} ({assignedList.Minions.Count} minions)");
+                    else
+                        ImGui.SetTooltip("No list assigned");
                 }
             }
         }

@@ -12,8 +12,10 @@ namespace LoyalCompanion
     public class MinionSelectWindow : Window
     {
         private readonly Configuration configuration;
-        private int currentGearsetId = -1;
+        private MinionList? currentList;
         private string searchText = string.Empty;
+        private string renameText = string.Empty;
+        private bool isRenaming;
         private List<MinionEntry>? cachedMinions;
         private Vector2? pendingPosition;
 
@@ -35,13 +37,14 @@ namespace LoyalCompanion
             };
         }
 
-        public void SetGearset(int gearsetId, string gearsetName, Vector2? buttonPos)
+        public void SetList(MinionList list, Vector2? buttonPos)
         {
-            this.currentGearsetId = gearsetId;
-            this.WindowName = $"Minion List - {gearsetName}###MinionSelect";
+            this.currentList = list;
+            this.WindowName = $"Minion List - {list.Name}###MinionSelect";
             this.IsOpen = true;
             this.cachedMinions = null;
             this.pendingPosition = buttonPos;
+            this.isRenaming = false;
         }
 
         public override void PreDraw()
@@ -55,17 +58,44 @@ namespace LoyalCompanion
 
         public override void Draw()
         {
-            if (currentGearsetId < 0)
+            if (currentList == null)
             {
-                ImGui.TextUnformatted("No gearset selected.");
+                ImGui.TextUnformatted("No list selected.");
                 return;
             }
 
-            if (!configuration.GearsetMinions.TryGetValue(currentGearsetId, out var selectedMinions))
+            var selectedMinions = currentList.Minions;
+
+            // List name / rename
+            if (isRenaming)
             {
-                selectedMinions = new List<uint>();
-                configuration.GearsetMinions[currentGearsetId] = selectedMinions;
+                ImGui.SetNextItemWidth(150);
+                if (ImGui.InputText("##rename", ref renameText, 128, ImGuiInputTextFlags.EnterReturnsTrue))
+                {
+                    ApplyRename();
+                }
+                ImGui.SameLine();
+                if (ImGui.Button("OK"))
+                {
+                    ApplyRename();
+                }
+                ImGui.SameLine();
+                if (ImGui.Button("Cancel"))
+                {
+                    isRenaming = false;
+                }
             }
+            else
+            {
+                ImGui.TextUnformatted(currentList.Name);
+                ImGui.SameLine();
+                if (ImGui.Button("Rename"))
+                {
+                    renameText = currentList.Name;
+                    isRenaming = true;
+                }
+            }
+            ImGui.Separator();
 
             // Search filter
             ImGui.SetNextItemWidth(-1);
@@ -146,14 +176,15 @@ namespace LoyalCompanion
             if (cachedMinions == null)
                 return;
 
-            var searchLower = searchText.ToLowerInvariant();
-
             foreach (var minion in cachedMinions)
             {
                 if (searchText.Length > 0 && !minion.Name.Contains(searchText, StringComparison.OrdinalIgnoreCase))
                     continue;
 
                 var isSelected = selectedMinions.Contains(minion.Id);
+
+                // Track row bounds for hover detection
+                var rowMin = ImGui.GetCursorScreenPos();
 
                 // Draw icon
                 var icon = Service.TextureProvider.GetFromGameIcon(new GameIconLookup(minion.IconId));
@@ -171,6 +202,20 @@ namespace LoyalCompanion
                     else if (!isSelected)
                         selectedMinions.Remove(minion.Id);
                     configuration.Save();
+                }
+
+                // Check hover on entire row
+                var rowMax = new Vector2(ImGui.GetContentRegionAvail().X + ImGui.GetWindowPos().X, ImGui.GetItemRectMax().Y);
+                var isRowHovered = ImGui.IsMouseHoveringRect(rowMin, rowMax);
+                if (isRowHovered)
+                {
+                    var portraitIcon = Service.TextureProvider.GetFromGameIcon(new GameIconLookup(minion.IconId + 64000));
+                    if (portraitIcon.TryGetWrap(out var portraitTex, out _) && portraitTex != null)
+                    {
+                        ImGui.BeginTooltip();
+                        ImGui.Image(portraitTex.Handle, new Vector2(256, 256));
+                        ImGui.EndTooltip();
+                    }
                 }
             }
         }
@@ -190,9 +235,21 @@ namespace LoyalCompanion
             configuration.Save();
         }
 
+        private void ApplyRename()
+        {
+            if (currentList != null && !string.IsNullOrWhiteSpace(renameText))
+            {
+                currentList.Name = renameText.Trim();
+                this.WindowName = $"Minion List - {currentList.Name}###MinionSelect";
+                configuration.Save();
+            }
+            isRenaming = false;
+        }
+
         public override void OnClose()
         {
             this.searchText = string.Empty;
+            this.isRenaming = false;
         }
     }
 }

@@ -83,7 +83,8 @@ namespace LoyalCompanion
             lastGearsetIndex = currentGearset;
 
             // Look up configured minions for this gearset
-            if (!configuration.GearsetMinions.TryGetValue(currentGearset, out var minionList) || minionList.Count == 0)
+            var minionList = configuration.GetMinionsForGearset(currentGearset);
+            if (minionList == null || minionList.Count == 0)
                 return;
 
             var companionOut = character->CompanionData.CompanionObject != null;
