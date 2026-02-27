@@ -12,16 +12,16 @@ namespace LoyalCompanion
     public class GearSetOverlay : IDisposable
     {
         private readonly Configuration configuration;
-        private readonly ListAssignWindow listAssignWindow;
+        private readonly MinionSelectWindow minionSelectWindow;
 
         // Layout constants (unscaled pixels) - adjust if alignment is off
         private const float HeaderOffset = 39f;
         private const float RowHeight = 28.5f;
 
-        public GearSetOverlay(Configuration configuration, ListAssignWindow listAssignWindow)
+        public GearSetOverlay(Configuration configuration, MinionSelectWindow minionSelectWindow)
         {
             this.configuration = configuration;
-            this.listAssignWindow = listAssignWindow;
+            this.minionSelectWindow = minionSelectWindow;
         }
 
         public void Dispose() { }
@@ -115,7 +115,7 @@ namespace LoyalCompanion
                     var btnRight = ImGui.GetItemRectMax();
                     var gearset = gearsetModule->GetGearset(gearsetId);
                     var name = gearset != null ? GetGearsetName(gearset) : $"Gearset {gearsetId + 1}";
-                    listAssignWindow.SetGearset(gearsetId, name, new Vector2(btnRight.X + 4, ImGui.GetItemRectMin().Y));
+                    minionSelectWindow.SetGearset(gearsetId, name, new Vector2(btnRight.X + 4, ImGui.GetItemRectMin().Y));
                 }
 
                 // Overlay gearset number on the button

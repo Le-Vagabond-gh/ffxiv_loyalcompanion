@@ -2,9 +2,11 @@ using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Textures;
 using Dalamud.Interface.Windowing;
 using FFXIVClientStructs.FFXIV.Client.Game.UI;
+using FFXIVClientStructs.FFXIV.Component.GUI;
 using Lumina.Excel.Sheets;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Numerics;
 
 namespace LoyalCompanion
@@ -12,10 +14,11 @@ namespace LoyalCompanion
     public class MinionSelectWindow : Window
     {
         private readonly Configuration configuration;
-        private MinionList? currentList;
+        private int currentGearsetId = -1;
         private string searchText = string.Empty;
         private string renameText = string.Empty;
         private bool isRenaming;
+        private bool confirmingDelete;
         private List<MinionEntry>? cachedMinions;
         private Vector2? pendingPosition;
 
@@ -27,24 +30,22 @@ namespace LoyalCompanion
         }
 
         public MinionSelectWindow(Configuration configuration)
-            : base("Minion List", ImGuiWindowFlags.None)
+            : base("Minion List###MinionSelect", ImGuiWindowFlags.NoResize)
         {
             this.configuration = configuration;
-            this.SizeConstraints = new WindowSizeConstraints
-            {
-                MinimumSize = new Vector2(300, 400),
-                MaximumSize = new Vector2(500, 800),
-            };
+            this.Size = new Vector2(350, 500);
+            this.SizeCondition = ImGuiCond.FirstUseEver;
         }
 
-        public void SetList(MinionList list, Vector2? buttonPos)
+        public void SetGearset(int gearsetId, string gearsetName, Vector2? buttonPos)
         {
-            this.currentList = list;
-            this.WindowName = $"Minion List - {list.Name}###MinionSelect";
+            this.currentGearsetId = gearsetId;
+            this.WindowName = $"Minions - {gearsetName}###MinionSelect";
             this.IsOpen = true;
             this.cachedMinions = null;
             this.pendingPosition = buttonPos;
             this.isRenaming = false;
+            this.confirmingDelete = false;
         }
 
         public override void PreDraw()
@@ -56,46 +57,150 @@ namespace LoyalCompanion
             }
         }
 
-        public override void Draw()
+        public override unsafe void Draw()
         {
-            if (currentList == null)
+            // Auto-close when gearset panel closes
+            try
             {
-                ImGui.TextUnformatted("No list selected.");
+                var addonPtr = Service.GameGui.GetAddonByName("GearSetList");
+                if (addonPtr.Address == nint.Zero)
+                {
+                    this.IsOpen = false;
+                    return;
+                }
+                var addon = (AtkUnitBase*)addonPtr.Address;
+                if (addon == null || !addon->IsVisible)
+                {
+                    this.IsOpen = false;
+                    return;
+                }
+            }
+            catch { }
+
+            if (currentGearsetId < 0)
+            {
+                ImGui.TextUnformatted("No gearset selected.");
                 return;
             }
 
-            var selectedMinions = currentList.Minions;
+            var assignedList = configuration.GetListForGearset(currentGearsetId);
 
-            // List name / rename
-            if (isRenaming)
+            // List assignment dropdown
+            ImGui.SetNextItemWidth(-1);
+            var previewName = assignedList != null ? $"{assignedList.Name} ({assignedList.Minions.Count})" : "None";
+            if (ImGui.BeginCombo("##listCombo", previewName))
             {
-                ImGui.SetNextItemWidth(150);
-                if (ImGui.InputText("##rename", ref renameText, 128, ImGuiInputTextFlags.EnterReturnsTrue))
+                if (ImGui.Selectable("None", assignedList == null))
                 {
-                    ApplyRename();
+                    configuration.GearsetListAssignments.Remove(currentGearsetId);
+                    configuration.Save();
                 }
-                ImGui.SameLine();
-                if (ImGui.Button("OK"))
+
+                foreach (var list in configuration.MinionLists)
                 {
-                    ApplyRename();
+                    var isSelected = assignedList != null && assignedList.Id == list.Id;
+                    var label = $"{list.Name} ({list.Minions.Count})";
+                    if (ImGui.Selectable(label, isSelected))
+                    {
+                        configuration.GearsetListAssignments[currentGearsetId] = list.Id;
+                        configuration.Save();
+                    }
                 }
+
+                ImGui.EndCombo();
+            }
+
+            // New / Rename / Delete buttons
+            if (ImGui.Button("New"))
+            {
+                var newList = new MinionList { Name = $"List {configuration.MinionLists.Count + 1}" };
+                configuration.MinionLists.Add(newList);
+                configuration.GearsetListAssignments[currentGearsetId] = newList.Id;
+                configuration.Save();
+            }
+
+            if (assignedList != null)
+            {
                 ImGui.SameLine();
-                if (ImGui.Button("Cancel"))
+                if (!isRenaming)
                 {
-                    isRenaming = false;
+                    if (ImGui.Button("Rename"))
+                    {
+                        renameText = assignedList.Name;
+                        isRenaming = true;
+                    }
+                }
+                else
+                {
+                    ImGui.SetNextItemWidth(100);
+                    if (ImGui.InputText("##rename", ref renameText, 128, ImGuiInputTextFlags.EnterReturnsTrue))
+                    {
+                        ApplyRename(assignedList);
+                    }
+                    ImGui.SameLine();
+                    if (ImGui.Button("OK"))
+                    {
+                        ApplyRename(assignedList);
+                    }
+                    ImGui.SameLine();
+                    if (ImGui.Button("Cancel##ren"))
+                    {
+                        isRenaming = false;
+                    }
+                }
+
+                ImGui.SameLine();
+                if (!confirmingDelete)
+                {
+                    if (ImGui.Button("Delete"))
+                    {
+                        confirmingDelete = true;
+                    }
+                }
+                else
+                {
+                    ImGui.PushStyleColor(ImGuiCol.Button, new Vector4(0.8f, 0.2f, 0.2f, 1.0f));
+                    if (ImGui.Button("Confirm"))
+                    {
+                        var keysToRemove = configuration.GearsetListAssignments
+                            .Where(kv => kv.Value == assignedList.Id)
+                            .Select(kv => kv.Key)
+                            .ToList();
+                        foreach (var key in keysToRemove)
+                            configuration.GearsetListAssignments.Remove(key);
+
+                        configuration.MinionLists.Remove(assignedList);
+                        configuration.Save();
+                        confirmingDelete = false;
+                        assignedList = null;
+                    }
+                    ImGui.PopStyleColor();
+                    ImGui.SameLine();
+                    if (ImGui.Button("Cancel##del"))
+                    {
+                        confirmingDelete = false;
+                    }
+                }
+
+                // Shared indicator
+                if (assignedList != null)
+                {
+                    var usageCount = configuration.GearsetListAssignments.Count(kv => kv.Value == assignedList.Id);
+                    if (usageCount > 1)
+                    {
+                        ImGui.SameLine();
+                        ImGui.TextColored(new Vector4(0.7f, 0.7f, 0.7f, 1.0f), $"(shared by {usageCount})");
+                    }
                 }
             }
-            else
-            {
-                ImGui.TextUnformatted(currentList.Name);
-                ImGui.SameLine();
-                if (ImGui.Button("Rename"))
-                {
-                    renameText = currentList.Name;
-                    isRenaming = true;
-                }
-            }
+
             ImGui.Separator();
+
+            // If no list assigned, stop here
+            if (assignedList == null)
+                return;
+
+            var selectedMinions = assignedList.Minions;
 
             // Search filter
             ImGui.SetNextItemWidth(-1);
@@ -235,12 +340,11 @@ namespace LoyalCompanion
             configuration.Save();
         }
 
-        private void ApplyRename()
+        private void ApplyRename(MinionList list)
         {
-            if (currentList != null && !string.IsNullOrWhiteSpace(renameText))
+            if (!string.IsNullOrWhiteSpace(renameText))
             {
-                currentList.Name = renameText.Trim();
-                this.WindowName = $"Minion List - {currentList.Name}###MinionSelect";
+                list.Name = renameText.Trim();
                 configuration.Save();
             }
             isRenaming = false;
@@ -250,6 +354,7 @@ namespace LoyalCompanion
         {
             this.searchText = string.Empty;
             this.isRenaming = false;
+            this.confirmingDelete = false;
         }
     }
 }

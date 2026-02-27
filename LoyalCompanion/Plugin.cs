@@ -15,7 +15,6 @@ namespace LoyalCompanion
 
         private readonly WindowSystem windowSystem = new("LoyalCompanion");
         private readonly MinionSelectWindow minionSelectWindow;
-        private readonly ListAssignWindow listAssignWindow;
         private readonly GearSetOverlay gearSetOverlay;
         private readonly MinionSummoner minionSummoner;
 
@@ -27,12 +26,10 @@ namespace LoyalCompanion
             this.Configuration.Initialize(this.PluginInterface);
 
             this.minionSelectWindow = new MinionSelectWindow(this.Configuration);
-            this.listAssignWindow = new ListAssignWindow(this.Configuration, this.minionSelectWindow);
-            this.gearSetOverlay = new GearSetOverlay(this.Configuration, this.listAssignWindow);
+            this.gearSetOverlay = new GearSetOverlay(this.Configuration, this.minionSelectWindow);
             this.minionSummoner = new MinionSummoner(this.Configuration);
 
             this.windowSystem.AddWindow(this.minionSelectWindow);
-            this.windowSystem.AddWindow(this.listAssignWindow);
 
             this.PluginInterface.UiBuilder.Draw += this.OnDraw;
             this.PluginInterface.UiBuilder.OpenMainUi += this.OpenMainUi;
@@ -52,16 +49,7 @@ namespace LoyalCompanion
                 var gearsetId = gearsetModule->CurrentGearsetIndex;
                 var gearset = gearsetModule->GetGearset(gearsetId);
                 var name = gearset != null ? GetGearsetName(gearset) : $"Gearset {gearsetId + 1}";
-
-                var assignedList = this.Configuration.GetListForGearset(gearsetId);
-                if (assignedList != null)
-                {
-                    this.minionSelectWindow.SetList(assignedList, null);
-                }
-                else
-                {
-                    this.listAssignWindow.SetGearset(gearsetId, name, null);
-                }
+                this.minionSelectWindow.SetGearset(gearsetId, name, null);
             }
             catch (Exception ex)
             {
