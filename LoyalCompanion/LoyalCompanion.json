@@ -2,7 +2,7 @@
     "Author": "Le Vagabond",
     "Name": "LoyalCompanion",
     "InternalName": "LoyalCompanion",
-    "AssemblyVersion": "0.0.0.1",
+    "AssemblyVersion": "0.0.0.2",
     "Description": "Associates minion lists with gearsets and auto-summons a random minion",
     "ApplicableVersion": "any",
     "RepoUrl": "https://github.com/Le-Vagabond-gh/ffxiv_loyalcompanion",

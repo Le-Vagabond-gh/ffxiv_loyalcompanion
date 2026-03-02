@@ -4,6 +4,7 @@ using Dalamud.Interface.Components;
 using FFXIVClientStructs.FFXIV.Client.UI.Misc;
 using FFXIVClientStructs.FFXIV.Component.GUI;
 using System;
+using System.Collections.Generic;
 using System.Numerics;
 using System.Text;
 
@@ -74,7 +75,7 @@ namespace LoyalCompanion
                 var gearsetModule = RaptureGearsetModule.Instance();
                 if (gearsetModule != null)
                 {
-                    DrawGearsetButtons(gearsetModule, scale);
+                    DrawGearsetButtons(gearsetModule, addon, scale);
                 }
 
                 ImGui.End();
@@ -85,11 +86,35 @@ namespace LoyalCompanion
             }
         }
 
-        private unsafe void DrawGearsetButtons(RaptureGearsetModule* gearsetModule, float scale)
+        private unsafe void DrawGearsetButtons(RaptureGearsetModule* gearsetModule, AtkUnitBase* addon, float scale)
         {
             var headerY = HeaderOffset * scale;
             var rowH = RowHeight * scale;
             var buttonHeight = ImGui.GetFrameHeight();
+
+            // Find the tree list to account for role category headers
+            var treeList = FindTreeList(addon);
+            var gearsetToVisualRow = new Dictionary<int, int>();
+            int firstVisible = 0;
+
+            if (treeList != null)
+            {
+                firstVisible = treeList->FirstVisibleItemIndex;
+                int enabledIdx = 0;
+                for (int j = 0; j < (int)treeList->Items.Count; j++)
+                {
+                    var item = treeList->Items[j].Value;
+                    if (item == null || item->UIntValues.Count == 0)
+                        continue;
+                    var itemType = (AtkComponentTreeListItemType)item->UIntValues[0];
+                    if (itemType == AtkComponentTreeListItemType.Leaf ||
+                        itemType == AtkComponentTreeListItemType.LastLeafInGroup)
+                    {
+                        gearsetToVisualRow[enabledIdx] = j;
+                        enabledIdx++;
+                    }
+                }
+            }
 
             for (byte i = 0; i < 100; i++)
             {
@@ -99,8 +124,17 @@ namespace LoyalCompanion
                 if (!gearsetModule->IsValidGearset(gearsetId))
                     continue;
 
-                // Position button to align with the gearset row
-                var rowY = headerY + i * rowH;
+                // Position button to align with the gearset row, accounting for category headers
+                int visualRow;
+                if (gearsetToVisualRow.TryGetValue(i, out var vr))
+                    visualRow = vr - firstVisible;
+                else
+                    visualRow = i;
+
+                if (visualRow < 0)
+                    continue;
+
+                var rowY = headerY + visualRow * rowH;
                 ImGui.SetCursorPosY(rowY + (rowH - buttonHeight) * 0.5f);
                 ImGui.SetCursorPosX(4f * scale);
 
@@ -148,6 +182,23 @@ namespace LoyalCompanion
                         ImGui.SetTooltip("No list assigned");
                 }
             }
+        }
+
+        private static unsafe AtkComponentTreeList* FindTreeList(AtkUnitBase* addon)
+        {
+            for (var j = 0; j < addon->UldManager.NodeListCount; j++)
+            {
+                var node = addon->UldManager.NodeList[j];
+                if (node == null || (ushort)node->Type < 1000)
+                    continue;
+                var componentNode = (AtkComponentNode*)node;
+                if (componentNode->Component != null &&
+                    componentNode->Component->GetComponentType() == ComponentType.TreeList)
+                {
+                    return (AtkComponentTreeList*)componentNode->Component;
+                }
+            }
+            return null;
         }
 
         private static unsafe string GetGearsetName(RaptureGearsetModule.GearsetEntry* gearset)
