@@ -281,7 +281,7 @@ namespace LoyalCompanion
             if (cachedMinions == null)
                 return;
 
-            foreach (var minion in cachedMinions)
+            foreach (var minion in cachedMinions.OrderByDescending(m => selectedMinions.Contains(m.Id)))
             {
                 if (searchText.Length > 0 && !minion.Name.Contains(searchText, StringComparison.OrdinalIgnoreCase))
                     continue;
