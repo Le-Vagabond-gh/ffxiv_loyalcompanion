@@ -50,7 +50,7 @@ namespace LoyalCompanion
                 return;
             lastCheck = now;
 
-            var localPlayer = Service.ClientState.LocalPlayer;
+            var localPlayer = Service.ObjectTable.LocalPlayer;
             if (localPlayer == null)
                 return;
 
