@@ -15,7 +15,7 @@ namespace LoyalCompanion
         private readonly Configuration configuration;
         private readonly MinionSelectWindow minionSelectWindow;
 
-        // Layout constants (unscaled pixels) - adjust if alignment is off
+        // Layout constants (unscaled pixels) - used only as a fallback if the list can't be read
         private const float HeaderOffset = 39f;
         private const float RowHeight = 28.5f;
 
@@ -88,31 +88,41 @@ namespace LoyalCompanion
 
         private unsafe void DrawGearsetButtons(RaptureGearsetModule* gearsetModule, AtkUnitBase* addon, float scale)
         {
-            var headerY = HeaderOffset * scale;
-            var rowH = RowHeight * scale;
             var buttonHeight = ImGui.GetFrameHeight();
+            var addonY = (float)addon->Y;
 
-            // Find the tree list to account for role category headers
-            var treeList = FindTreeList(addon);
-            var gearsetToVisualRow = new Dictionary<int, int>();
-            int firstVisible = 0;
+            // The gearset list is a flat AtkComponentList (one row per gearset, in display
+            // order). It repositions its row nodes as it scrolls, so we read each rendered
+            // row's node position live and key it by the list item index (== display index).
+            var list = FindGearsetList(addon);
+            var rowScreen = new Dictionary<int, (float Y, float H)>();
+            bool haveList = false;
+            float listTopScreen = 0f, listBottomScreen = 0f;
 
-            if (treeList != null)
+            if (list != null)
             {
-                firstVisible = treeList->FirstVisibleItemIndex;
-                int enabledIdx = 0;
-                for (int j = 0; j < (int)treeList->Items.Count; j++)
+                var listNode = (AtkResNode*)list->OwnerNode;
+                if (listNode != null)
                 {
-                    var item = treeList->Items[j].Value;
-                    if (item == null || item->UIntValues.Count == 0)
-                        continue;
-                    var itemType = (AtkComponentTreeListItemType)item->UIntValues[0];
-                    if (itemType == AtkComponentTreeListItemType.Leaf ||
-                        itemType == AtkComponentTreeListItemType.LastLeafInGroup)
+                    listTopScreen = listNode->ScreenY;
+                    listBottomScreen = listTopScreen + listNode->Height * scale;
+
+                    var renderers = list->ItemRendererList;
+                    if (renderers != null)
                     {
-                        gearsetToVisualRow[enabledIdx] = j;
-                        enabledIdx++;
+                        for (int r = 0; r < list->AllocatedItemRendererListLength; r++)
+                        {
+                            var renderer = renderers[r].AtkComponentListItemRenderer;
+                            if (renderer == null)
+                                continue;
+                            var node = (AtkResNode*)renderer->OwnerNode;
+                            if (node == null || !node->IsVisible())
+                                continue;
+                            rowScreen[renderer->ListItemIndex] = (node->ScreenY, node->Height * scale);
+                        }
                     }
+
+                    haveList = rowScreen.Count > 0;
                 }
             }
 
@@ -124,67 +134,82 @@ namespace LoyalCompanion
                 if (!gearsetModule->IsValidGearset(gearsetId))
                     continue;
 
-                // Position button to align with the gearset row, accounting for category headers
-                int visualRow;
-                if (gearsetToVisualRow.TryGetValue(i, out var vr))
-                    visualRow = vr - firstVisible;
+                float rowY, rowH;
+                if (haveList)
+                {
+                    // The display index i is the list item index; no rendered row -> scrolled out.
+                    if (!rowScreen.TryGetValue(i, out var pos))
+                        continue;
+
+                    var centre = pos.Y + pos.H * 0.5f;
+                    if (centre < listTopScreen || centre > listBottomScreen)
+                        continue;
+
+                    rowH = pos.H;
+                    rowY = pos.Y - addonY;
+                }
                 else
-                    visualRow = i;
+                {
+                    // Fallback to fixed layout if the list can't be read.
+                    rowH = RowHeight * scale;
+                    rowY = HeaderOffset * scale + i * rowH;
+                }
 
-                if (visualRow < 0)
-                    continue;
-
-                var rowY = headerY + visualRow * rowH;
                 ImGui.SetCursorPosY(rowY + (rowH - buttonHeight) * 0.5f);
                 ImGui.SetCursorPosX(4f * scale);
 
-                var assignedList = configuration.GetListForGearset(gearsetId);
-                var hasMinions = assignedList != null && assignedList.Minions.Count > 0;
-
-                if (hasMinions)
-                    ImGui.PushStyleColor(ImGuiCol.Text, new Vector4(0.0f, 0.8f, 0.4f, 1.0f));
-
-                if (ImGuiComponents.IconButton($"##paw{gearsetId}", FontAwesomeIcon.Paw))
-                {
-                    var btnRight = ImGui.GetItemRectMax();
-                    var gearset = gearsetModule->GetGearset(gearsetId);
-                    var name = gearset != null ? GetGearsetName(gearset) : $"Gearset {gearsetId + 1}";
-                    minionSelectWindow.SetGearset(gearsetId, name, new Vector2(btnRight.X + 4, ImGui.GetItemRectMin().Y));
-                }
-
-                // Overlay gearset number on the button
-                var btnMin = ImGui.GetItemRectMin();
-                var btnMax = ImGui.GetItemRectMax();
-                var label = (gearsetId + 1).ToString();
-                var textSize = ImGui.CalcTextSize(label);
-                var textPos = new Vector2(
-                    btnMin.X + (btnMax.X - btnMin.X - textSize.X) * 0.5f,
-                    btnMin.Y + (btnMax.Y - btnMin.Y - textSize.Y) * 0.5f);
-                var drawList = ImGui.GetForegroundDrawList();
-                var outlineColor = ImGui.GetColorU32(new Vector4(0, 0, 0, 1));
-                var textColor = hasMinions
-                    ? ImGui.GetColorU32(new Vector4(0.0f, 0.8f, 0.4f, 1.0f))
-                    : ImGui.GetColorU32(new Vector4(1, 1, 1, 1));
-                for (var dx = -1; dx <= 1; dx++)
-                    for (var dy = -1; dy <= 1; dy++)
-                        if (dx != 0 || dy != 0)
-                            drawList.AddText(textPos + new Vector2(dx, dy), outlineColor, label);
-                drawList.AddText(textPos, textColor, label);
-
-                if (hasMinions)
-                    ImGui.PopStyleColor();
-
-                if (ImGui.IsItemHovered())
-                {
-                    if (assignedList != null)
-                        ImGui.SetTooltip($"{assignedList.Name} ({assignedList.Minions.Count} minions)");
-                    else
-                        ImGui.SetTooltip("No list assigned");
-                }
+                DrawPawButton(gearsetModule, gearsetId);
             }
         }
 
-        private static unsafe AtkComponentTreeList* FindTreeList(AtkUnitBase* addon)
+        private unsafe void DrawPawButton(RaptureGearsetModule* gearsetModule, int gearsetId)
+        {
+            var assignedList = configuration.GetListForGearset(gearsetId);
+            var hasMinions = assignedList != null && assignedList.Minions.Count > 0;
+
+            if (hasMinions)
+                ImGui.PushStyleColor(ImGuiCol.Text, new Vector4(0.0f, 0.8f, 0.4f, 1.0f));
+
+            if (ImGuiComponents.IconButton($"##paw{gearsetId}", FontAwesomeIcon.Paw))
+            {
+                var btnRight = ImGui.GetItemRectMax();
+                var gearset = gearsetModule->GetGearset(gearsetId);
+                var name = gearset != null ? GetGearsetName(gearset) : $"Gearset {gearsetId + 1}";
+                minionSelectWindow.SetGearset(gearsetId, name, new Vector2(btnRight.X + 4, ImGui.GetItemRectMin().Y));
+            }
+
+            // Overlay gearset number on the button
+            var btnMin = ImGui.GetItemRectMin();
+            var btnMax = ImGui.GetItemRectMax();
+            var label = (gearsetId + 1).ToString();
+            var textSize = ImGui.CalcTextSize(label);
+            var textPos = new Vector2(
+                btnMin.X + (btnMax.X - btnMin.X - textSize.X) * 0.5f,
+                btnMin.Y + (btnMax.Y - btnMin.Y - textSize.Y) * 0.5f);
+            var drawList = ImGui.GetForegroundDrawList();
+            var outlineColor = ImGui.GetColorU32(new Vector4(0, 0, 0, 1));
+            var textColor = hasMinions
+                ? ImGui.GetColorU32(new Vector4(0.0f, 0.8f, 0.4f, 1.0f))
+                : ImGui.GetColorU32(new Vector4(1, 1, 1, 1));
+            for (var dx = -1; dx <= 1; dx++)
+                for (var dy = -1; dy <= 1; dy++)
+                    if (dx != 0 || dy != 0)
+                        drawList.AddText(textPos + new Vector2(dx, dy), outlineColor, label);
+            drawList.AddText(textPos, textColor, label);
+
+            if (hasMinions)
+                ImGui.PopStyleColor();
+
+            if (ImGui.IsItemHovered())
+            {
+                if (assignedList != null)
+                    ImGui.SetTooltip($"{assignedList.Name} ({assignedList.Minions.Count} minions)");
+                else
+                    ImGui.SetTooltip("No list assigned");
+            }
+        }
+
+        private static unsafe AtkComponentList* FindGearsetList(AtkUnitBase* addon)
         {
             for (var j = 0; j < addon->UldManager.NodeListCount; j++)
             {
@@ -193,9 +218,9 @@ namespace LoyalCompanion
                     continue;
                 var componentNode = (AtkComponentNode*)node;
                 if (componentNode->Component != null &&
-                    componentNode->Component->GetComponentType() == ComponentType.TreeList)
+                    componentNode->Component->GetComponentType() == ComponentType.List)
                 {
-                    return (AtkComponentTreeList*)componentNode->Component;
+                    return (AtkComponentList*)componentNode->Component;
                 }
             }
             return null;
