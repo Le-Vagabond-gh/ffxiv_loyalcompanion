@@ -78,6 +78,33 @@ namespace LoyalCompanion
             return list?.Minions;
         }
 
+        // Swap the list assignments of two gearsets - used when gearsets are reordered
+        // in-game (move set up/down) so the minion list follows its gearset.
+        public void SwapGearsetAssignments(int gearsetIdA, int gearsetIdB)
+        {
+            GearsetListAssignments.TryGetValue(gearsetIdA, out var listA);
+            GearsetListAssignments.TryGetValue(gearsetIdB, out var listB);
+
+            if (listB != null)
+                GearsetListAssignments[gearsetIdA] = listB;
+            else
+                GearsetListAssignments.Remove(gearsetIdA);
+
+            if (listA != null)
+                GearsetListAssignments[gearsetIdB] = listA;
+            else
+                GearsetListAssignments.Remove(gearsetIdB);
+
+            Save();
+        }
+
+        // Drop a gearset's assignment - used when the gearset is deleted in-game.
+        public void RemoveGearsetAssignment(int gearsetId)
+        {
+            if (GearsetListAssignments.Remove(gearsetId))
+                Save();
+        }
+
         public void Save()
         {
             this.PluginInterface!.SavePluginConfig(this);

@@ -17,6 +17,7 @@ namespace LoyalCompanion
         private readonly MinionSelectWindow minionSelectWindow;
         private readonly GearSetOverlay gearSetOverlay;
         private readonly MinionSummoner minionSummoner;
+        private readonly GearsetSyncHook gearsetSyncHook;
 
         public Plugin(IDalamudPluginInterface pluginInterface)
         {
@@ -28,6 +29,7 @@ namespace LoyalCompanion
             this.minionSelectWindow = new MinionSelectWindow(this.Configuration);
             this.gearSetOverlay = new GearSetOverlay(this.Configuration, this.minionSelectWindow);
             this.minionSummoner = new MinionSummoner(this.Configuration);
+            this.gearsetSyncHook = new GearsetSyncHook(this.Configuration);
 
             this.windowSystem.AddWindow(this.minionSelectWindow);
 
@@ -89,6 +91,7 @@ namespace LoyalCompanion
             this.windowSystem.RemoveAllWindows();
             this.gearSetOverlay.Dispose();
             this.minionSummoner.Dispose();
+            this.gearsetSyncHook.Dispose();
             Service.PluginLog.Info("LoyalCompanion disposed");
         }
     }
