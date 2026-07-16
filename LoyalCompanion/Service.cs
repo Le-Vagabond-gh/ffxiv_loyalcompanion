@@ -14,5 +14,6 @@ namespace LoyalCompanion
         [PluginService] public static IDataManager DataManager { get; private set; } = null!;
         [PluginService] public static ITextureProvider TextureProvider { get; private set; } = null!;
         [PluginService] public static IGameInteropProvider GameInteropProvider { get; private set; } = null!;
+        [PluginService] public static IContextMenu ContextMenu { get; private set; } = null!;
     }
 }
