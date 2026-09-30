@@ -5,74 +5,15 @@ on:
     paths:
       - 'LoyalCompanion/**'
       - 'LoyalCompanion.sln'
+      - '.github/workflows/build-release.yml'
   workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: '10.0.x'
-
-      - name: Download Dalamud
-        run: |
-          curl -L https://goatcorp.github.io/dalamud-distrib/stg/latest.zip -o dalamud.zip
-          unzip dalamud.zip -d dalamud
-          rm dalamud.zip
-
-      - name: Build
-        env:
-          DALAMUD_HOME: ${{ github.workspace }}/dalamud
-        run: dotnet build -c Release --property:WarningLevel=0
-        working-directory: LoyalCompanion
-
-      - name: Get version from tag
-        id: get_version
-        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
-
-      - name: Upload build artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: LoyalCompanion
-          path: |
-            LoyalCompanion/bin/Release/LoyalCompanion.dll
-            LoyalCompanion/bin/Release/LoyalCompanion.json
-
-      - name: Create Release
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
-            TAG="${{ github.ref_name }}"
-          else
-            TAG="v$(date +'%Y%m%d%H%M%S')-${GITHUB_SHA::7}"
-          fi
-
-          # Get the previous tag for changelog
-          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
-
-          # Generate changelog from commits
-          if [ -n "$PREV_TAG" ]; then
-            COMMITS=$(git log --pretty=format:"- %s" "$PREV_TAG"..HEAD)
-            CHANGELOG_LINK="**Full Changelog**: https://github.com/${{ github.repository }}/compare/$PREV_TAG...$TAG"
-            NOTES="$COMMITS"$'\n\n'"$CHANGELOG_LINK"
-          else
-            NOTES=$(git log --pretty=format:"- %s" 2>/dev/null || echo "Initial release")
-          fi
-
-          gh release create "$TAG" \
-            LoyalCompanion/bin/Release/LoyalCompanion.dll \
-            LoyalCompanion/bin/Release/LoyalCompanion.json \
-            --notes "$NOTES" \
-            --title "Release $TAG"
+  release:
+    uses: Le-Vagabond-gh/FFXIV_Dalamud_Repo/.github/workflows/plugin-release.yml@main
+    with:
+      project: LoyalCompanion
+    secrets: inherit
