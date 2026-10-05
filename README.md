@@ -13,16 +13,21 @@ Associates minion lists with gearsets and auto-summons a random minion from the 
 - Respects game state: won't summon while mounted, in combat, in duties, etc.
 
 ## Installation
-- Download the DLL and manifest JSON from [Releases](https://github.com/Le-Vagabond-gh/ffxiv_loyalcompanion/releases) in the same location
 - Open the Dalamud Plugin Installer
 - Go to Settings
 - Head to the "Experimental" tab
-- Under "Dev Plugin Locations", click "Select dev plugin DLL"
-- Add the DLL you downloaded
-- Press "Save and Close"
-- in the main plugin installer window, enable the plugin in Dev Tools
+- Under "Custom Plugin Repositories", paste this URL and click the `+` button:
 
-note: adding custom repositories to Dalamud is a security risk, this way protects you from malicious updates from untrusted sources
+  ```
+  https://raw.githubusercontent.com/Le-Vagabond-gh/FFXIV_Dalamud_Repo/main/repo.json
+  ```
+
+- Press "Save and Close"
+- Install "LoyalCompanion" from the main plugin installer window
+
+Updates then arrive through the plugin installer like for any other plugin.
+
+If you would rather control updates yourself, download `LoyalCompanion-<version>-full.zip` from [Releases](https://github.com/Le-Vagabond-gh/ffxiv_loyalcompanion/releases) (releases are immutable, so a published build can never be swapped), extract it and add the extracted `LoyalCompanion.dll` as a dev plugin location under the same "Experimental" tab.
 
 ## Usage
 1. Open the Gear Set List in-game
