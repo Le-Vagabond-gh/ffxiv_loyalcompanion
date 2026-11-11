@@ -118,7 +118,18 @@ namespace LoyalCompanion
                             var node = (AtkResNode*)renderer->OwnerNode;
                             if (node == null || !node->IsVisible())
                                 continue;
-                            rowScreen[renderer->ListItemIndex] = (node->ScreenY, node->Height * scale);
+
+                            // the list keeps one spare renderer past the visible rows. when the
+                            // scroll is row-aligned it is parked on top of the first row with the
+                            // index of the next row down and its visible flag still set, which
+                            // drew a second paw (wrong gearset) over row 1
+                            var idx = renderer->ListItemIndex;
+                            var first = list->FirstVisibleItemIndex;
+                            var last = first + list->NumVisibleItems - (list->ScrollOffset == 0 ? 1 : 0);
+                            if (list->NumVisibleItems > 0 && (idx < first || idx > last))
+                                continue;
+
+                            rowScreen[idx] = (node->ScreenY, node->Height * scale);
                         }
                     }
 
